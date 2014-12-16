@@ -44,7 +44,7 @@
                 filter_state :: term()}).
 
 -export([start_link/3, start_link/4, start_link/5, resize/2,
-         active/3, notify/1, post/2]).
+         active/3, notify/1, post/2, proxy/2]).
 -export([init/1,
          active/2, passive/2, notify/2,
          handle_event/3, handle_sync_event/4, handle_info/3,
@@ -116,6 +116,11 @@ notify(Box) ->
 post(Box, Msg) ->
     gen_fsm:send_event(Box, {post, Msg}).
 
+%% @doc Sends a message to the PO Box owner, without buffering.
+-spec proxy(pid(), term()) -> ok.
+proxy(Box, Msg) ->
+    gen_fsm:send_event(Box, {proxy, Msg}).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_fsm Function Definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -135,6 +140,8 @@ active(notify, S = #state{}) ->
 active({post, Msg}, S = #state{buf=Buf}) ->
     NewBuf = insert(Msg, Buf),
     send(S#state{buf=NewBuf});
+active({proxy, Msg}, S) ->
+    send_proxy(Msg, active, S);
 active(_Msg, S = #state{}) ->
     %% unexpected
     {next_state, active, S}.
@@ -153,6 +160,8 @@ passive({active, Fun, FunState}, S = #state{buf=Buf}) ->
     end;
 passive({post, Msg}, S = #state{buf=Buf}) ->
     {next_state, passive, S#state{buf=insert(Msg, Buf)}};
+passive({proxy, Msg}, S) ->
+    send_proxy(Msg, passive, S);
 passive(_Msg, S = #state{}) ->
     %% unexpected
     {next_state, passive, S}.
@@ -168,6 +177,8 @@ notify(notify, S = #state{}) ->
     {next_state, notify, S};
 notify({post, Msg}, S = #state{buf=Buf}) ->
     send_notification(S#state{buf=insert(Msg, Buf)});
+notify({proxy, Msg}, S) ->
+    send_proxy(Msg, notify, S);
 notify(_Msg, S = #state{}) ->
     %% unexpected
     {next_state, notify, S}.
@@ -187,6 +198,9 @@ handle_sync_event(_Event, _From, StateName, State) ->
 handle_info({post, Msg}, StateName, State) ->
     %% We allow anonymous posting and redirect it to the internal form.
     ?MODULE:StateName({post, Msg}, State);
+handle_info({proxy, Msg}, StateName, State) ->
+    %% We allow anonymous posting and redirect it to the internal form.
+    ?MODULE:StateName({proxy, Msg}, State);
 handle_info(_Info, StateName, State) ->
     {next_state, StateName, State}.
 
@@ -207,6 +221,10 @@ send(S=#state{buf = Buf, owner=Pid, filter=Fun, filter_state=FilterState}) ->
     Pid ! {mail, self(), Msgs, Count, Dropped},
     NewState = S#state{buf=NewBuf, filter=undefined, filter_state=undefined},
     {next_state, passive, NewState}.
+
+send_proxy(Msg, State, S=#state{owner=Pid}) ->
+    Pid ! {proxy, self(), Msg},
+    {next_state, State, S}.
 
 send_notification(S = #state{owner=Owner}) ->
     Owner ! {mail, self(), new_data},
