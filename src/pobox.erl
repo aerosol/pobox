@@ -204,7 +204,7 @@ handle_sync_event({resize, NewSize}, _From, StateName, S=#state{buf=Buf}) ->
 handle_sync_event(owner, _From, StateName, S=#state{owner=Pid}) ->
     {reply, {ok, Pid}, StateName, S};
 handle_sync_event(shutdown, _From, _, S) ->
-    {stop, normal, S};
+    {stop, normal, ok, S};
 handle_sync_event(_Event, _From, StateName, State) ->
     %% die of starvation, caller!
     {next_state, StateName, State}.
