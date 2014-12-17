@@ -44,7 +44,7 @@
                 filter_state :: term()}).
 
 -export([start_link/3, start_link/4, start_link/5, resize/2,
-         active/3, notify/1, post/2, proxy/2, owner/1]).
+         active/3, notify/1, post/2, proxy/2, owner/1, stop/1]).
 -export([init/1,
          active/2, passive/2, notify/2,
          handle_event/3, handle_sync_event/4, handle_info/3,
@@ -126,6 +126,12 @@ proxy(Box, Msg) ->
 owner(Box) ->
     gen_fsm:sync_send_all_state_event(Box, owner).
 
+
+%% @doc Kill the box
+-spec stop(pid()) -> ok.
+stop(Box) ->
+    gen_fsm:sync_send_all_state_event(Box, shutdown).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_fsm Function Definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -197,6 +203,8 @@ handle_sync_event({resize, NewSize}, _From, StateName, S=#state{buf=Buf}) ->
     {reply, ok, StateName, S#state{buf=resize_buf(NewSize,Buf)}};
 handle_sync_event(owner, _From, StateName, S=#state{owner=Pid}) ->
     {reply, {ok, Pid}, StateName, S};
+handle_sync_event(shutdown, _From, _, S) ->
+    {stop, normal, S};
 handle_sync_event(_Event, _From, StateName, State) ->
     %% die of starvation, caller!
     {next_state, StateName, State}.
