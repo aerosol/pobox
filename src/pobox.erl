@@ -60,14 +60,14 @@
 %% message ordering.
 %% The initial state can be either passive or notify, depending on whether
 %% the user wants to get notifications of new messages as soon as possible.
--spec start_link(pid() | atom(), max(), 'stack' | 'queue') -> {ok, pid()}.
+-spec start_link(pid() | atom(), max(), 'stack' | 'queue' | 'keep_old') -> {ok, pid()}.
 start_link(Owner, Size, Type) ->
     start_link(Owner, Size, Type, notify).
 
 %% This one is messy because we have two clauses with 4 values, so we look them
 %% up based on guards.
--spec start_link(pid() | atom(), max(), 'stack' | 'queue', 'notify'|'passive') -> {ok, pid()}
-      ;         (term(), pid(), max(), stack | queue) -> {ok, pid()}.
+-spec start_link(pid() | atom(), max(), 'stack' | 'queue' | 'keep_old', 'notify'|'passive') -> {ok, pid()}
+      ;         (term(), pid(), max(), stack | queue | keep_old) -> {ok, pid()}.
 start_link(Owner, Size, Type, StateName) when is_pid(Owner);
                                               is_atom(Owner),
                                               is_integer(Size), Size > 0 ->
@@ -75,7 +75,7 @@ start_link(Owner, Size, Type, StateName) when is_pid(Owner);
 start_link(Name, Owner, Size, Type) ->
     start_link(Name, Owner, Size, Type, notify).
 
--spec start_link(term(), pid(), max(), stack | queue,
+-spec start_link(term(), pid(), max(), stack | queue | keep_old,
                  'notify'|'passive') -> {ok, pid()}.
 start_link(Name, Owner, Size, Type, StateName) when Size > 0,
                                                     Type =:= queue orelse
